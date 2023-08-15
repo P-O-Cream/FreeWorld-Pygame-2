@@ -3,8 +3,6 @@
 
 #     Distributed under GPL license
 #     See copy at https://opensource.org/licenses/GPL-3.0
-# FreeWorld Pygame 2.0 is the rebuild version of FreeWorld
-# It is based on Pygame and Tkinter
 
 import time                    
 import os
@@ -16,21 +14,13 @@ from PIL import *
 from tkinter.ttk import Combobox
 import tkinter.messagebox as tk_mb
 
-update_info = """FreeWorld Pygame-创世 更新内容
-1.代码
-·   重构了全部代码并删除了注释
-·   规范了命名：
-    -·所有类名使用驼峰命名法
-    -·所有函数名和变量名全小写，词之间使用_隔开
-2.地形
-·   重构了整个地形生成模块并放入类TerrainGeneration中
-·   加入了两种模式：超平坦模式&正常模式
-3.UI
-·   使用tkinter作为开头配置选择的UI
-·   使用pygame作为游戏主题的UI
-
-如您所见，我们对整个游戏进行重构，接下来这个版本与FreeWorld终端会分开更新
-即两个版本没有任何关系，我们期待FreeWorld Pygame的下一次更新！"""
+update_info = """FreeWorld Pygame-创世 2.0.1 更新内容
+1.地形
+·在正常模式下加入新二级地形——树
+·优化了全部算法，修改了过多重复性代码，缩减了代码
+·在超平坦模式下加入新二级地形——山
+·超平坦模式改为无二级地形，正常模式改为陡峭模式，原超平坦模式加入山后变为正常模式
+·加入陡峭模式——原正常模式"""
 
 class TerrainGeneration(object):
     def __init__(self):
@@ -44,8 +34,10 @@ class TerrainGeneration(object):
         self.common_tree_probability = 8
         self.yellow_tree_probability = 0
         self.purple_tree_probability = 0
+        self.mountain_probability = 18
         self.leave_probability = 4
         self.tree_height = [5,7]
+        self.terrain_high = 0
     
     # @copyright Copyright [C] Xiaoxuan 2023
     def fill(self,change_value,*coordinate):
@@ -54,67 +46,54 @@ class TerrainGeneration(object):
             
     def fill2(self,height,x,y,change_value):
         for i in range(height):
-            self.map[x][y] = change_value
-            x -= 1
+            self.map[x][y] = change_value;x -= 1
     
-    def plant_tree(self):
-        for i in range(self.map_width):
-            if i > 1 and i < self.map_width - 3:
-                plant_tree = random.randint(0,self.common_tree_probability)
-                if plant_tree == 0 and self.map[29][i-1] != "5" and self.map[29][i-2] != "5":
-                    tree_height = random.randint(self.tree_height[0],self.tree_height[1])
-                    self.fill2(tree_height,self.sky_height-1,i,"5")
-                    tree_leave = random.randint(0,self.leave_probability)
-                    if tree_leave == 0:
-                        self.fill(
-                            "4",
-                            (29-tree_height+1,i+1),(29-tree_height,i+1),(29-tree_height+-1,i+1),
-                            (29-tree_height+1,i),(29-tree_height+1,i+2),
-                            (29-tree_height+1,i+3),(29-tree_height+1,i-1),
-                            (29-tree_height,i+2),(29-tree_height,i)
-                            )
-                    if tree_leave == 1:
-                        self.fill(
-                            "4",
-                            (29-tree_height+1,i+1),(29-tree_height,i+1),(29-tree_height-1,i+1),
-                            (29-tree_height+1,i),(29-tree_height+1,i+2),
-                            (29-tree_height+1,i+3),(29-tree_height+2,i+2),
-                            (29-tree_height,i+2),(29-tree_height,i)
-                            )
-                    if tree_leave == 2:
-                        self.fill(
-                            "4",
-                            (29-tree_height+1,i+1),(29-tree_height,i+1),(29-tree_height-1,i+1),
-                            (29-tree_height+1,i),(29-tree_height+1,i+2),
-                            (29-tree_height+1,i+3),(29-tree_height+2,i),
-                            (29-tree_height,i+2),(29-tree_height,i)
-                            )
-                    if tree_leave == 3:
-                        self.fill(
-                            "4",
-                            (29-tree_height+1,i+1),(29-tree_height,i+1),(29-tree_height-1,i+1),
-                            (29-tree_height+1,i),(29-tree_height+1,i+2),
-                            (29-tree_height+1,i+3),(29-tree_height+2,i),(29-tree_height+2,i+2),
-                            (29-tree_height,i+2),(29-tree_height,i)
-                            )
-                    if tree_leave == 4:
-                        self.fill(
-                            "4",
-                            (29-tree_height+1,i+1),(29-tree_height,i+1),(29-tree_height+-1,i+1),
-                            (29-tree_height+1,i),(29-tree_height+1,i+2),
-                            (29-tree_height+1,i+3),(29-tree_height+1,i-1),
-                            (29-tree_height,i+2),(29-tree_height,i),
-                            (29-tree_height,i+2),(29-tree_height-1,i+2)
-                            )
+    def tree_generation(self,i):
+        self.terrain_high = self.map_height - 1
+        self.tree_height_number = random.randint(self.tree_height[0],self.tree_height[1])
+        while self.map[self.terrain_high][i] != "0":self.terrain_high -= 1
+        self.fill2(self.tree_height_number,self.terrain_high,i,"5")
+        self.fill("4",(self.terrain_high-self.tree_height_number+1,i+1))
+        if random.randint(0,1) == 0:self.fill("4",(self.terrain_high-self.tree_height_number,i+1))
+        self.fill("4",(self.terrain_high-self.tree_height_number+1,i),(self.terrain_high-self.tree_height_number+1,i+2))
+        self.fill("4",(self.terrain_high-self.tree_height_number+2,i),(self.terrain_high-self.tree_height_number+2,i+2))
+        if random.randint(0,1) == 0:self.fill("4",(self.terrain_high-self.tree_height_number+3,i))
+        if random.randint(0,1) == 0:self.fill("4",(self.terrain_high-self.tree_height_number+3,i+2))
+        if random.randint(0,1) == 0:self.fill("4",(self.terrain_high-self.tree_height_number+2,i+3))
+        if random.randint(0,1) == 0:self.fill("4",(self.terrain_high-self.tree_height_number+2,i-1))
+    
+    def mountain_generation(self,i):
+        self.terrain_high = self.map_height - 1
+        while self.map[self.terrain_high][i] != "0":self.terrain_high -= 1
+        self.mountain_init_height = 4
+        self.minus = -1
+        for j in range(random.randint(4,7)):
+            self.fill2(self.mountain_init_height,self.terrain_high,i+self.minus,"2")
+            self.mountain_init_height += random.randint(-2,2)
+            self.minus += 1
+        
     def terrain_generation(self,type):
         if type == 1:
             self.map = [["0" for i in range(self.map_width)] for j in range(self.sky_height)] + \
                        [["3" for i in range(self.map_width)] for j in range(self.grass_block_height)] + \
                        [["1" for i in range(self.map_width)] for j in range(self.soil_block_height)] + \
                        [["2" for i in range(self.map_width)] for j in range(self.ground_height)]
-            self.plant_tree()
-                
-        else:
+        elif type == 2:
+            self.map = [["0" for i in range(self.map_width)] for j in range(self.sky_height)] + \
+                       [["3" for i in range(self.map_width)] for j in range(self.grass_block_height)] + \
+                       [["1" for i in range(self.map_width)] for j in range(self.soil_block_height)] + \
+                       [["2" for i in range(self.map_width)] for j in range(self.ground_height)]
+            for i in range(self.map_width):
+                if i > 6 and i < self.map_width - 6:
+                    plant_mountain = random.randint(0,self.mountain_probability)
+                    if plant_mountain == 0 and self.map[self.terrain_high][i-1] != "5" and self.map[self.terrain_high][i-2] != "5":
+                        self.mountain_generation(i)
+            for i in range(self.map_width):
+                if i > 3 and i < self.map_width - 3:
+                    plant_tree = random.randint(0,self.common_tree_probability)
+                    if plant_tree == 0 and self.map[self.terrain_high][i-1] != "5" and self.map[self.terrain_high][i-2] != "5":
+                        self.tree_generation(i)
+        elif type == 3:
             self.map = [["0" for i in range(self.map_width)] for j in range(self.map_height)]
             self.init_ground = 50
             for i in range(self.map_width):
@@ -124,23 +103,26 @@ class TerrainGeneration(object):
                 addition = random.randint(0,4)
                 number = random.randint(1,2)
                 if addition == 1:
-                    if self.init_ground < self.map_height-2:
-                        self.init_ground += number
+                    if self.init_ground < self.map_height - self.tree_height[1] - 4:self.init_ground += number
                 if addition == 2:
-                    if self.init_ground > 2:
-                        self.init_ground -= number
+                    if self.init_ground > 2:self.init_ground -= number
+            for i in range(self.map_width):
+                if i > 3 and i < self.map_width - 1:
+                    plant_tree = random.randint(0,self.common_tree_probability)
+                    if plant_tree == 0 and self.map[self.terrain_high][i-1] != "5" and self.map[self.terrain_high][i-2] != "5":
+                        self.tree_generation(i)
                 
     def print_generation(self):
         for i in range(self.map_height):
             for j in range(self.map_width):
                 if self.map[i][j] == "0":print("\033[48;2;50;233;223m\033[30m  ",end="")
-                if self.map[i][j] == "2":print("\033[48;2;64;192;32m  ",end="")
+                if self.map[i][j] == "2":print("\033[48;2;192;192;192m  ",end="")
                 if self.map[i][j] == "5":print("\033[48;2;128;128;16m▒▒",end="")
                 if self.map[i][j] == "3":print("\033[48;5;52m\033[38;5;118m▀▀",end="")
                 if self.map[i][j] == "1":print("\033[48;5;52m  ",end="")
+                if self.map[i][j] == "4":print("\033[48;2;64;192;32m  ",end="")
             print();time.sleep(0.3)
-        print("\033[m") 
-        
+        print("\033[m")
 _TerrainGeneration = TerrainGeneration()
 
 class CommandParse(object):
@@ -166,18 +148,18 @@ class MainPygameInterface(object):
         self.icon_surface = pygame.image.load("游戏图标.png")
         pygame.display.set_icon(self.icon_surface)
         
-        self.soil_block = pygame.image.load("土方块.png")
-        self.stone_block = pygame.image.load("石方块.png")
-        self.grass_block = pygame.image.load("草方块.png")
-        self.leave_block = pygame.image.load("树叶方块.png")
-        self.wood_block = pygame.image.load("木方块.png")
-        self.sand_block = pygame.image.load("沙子方块.png")
-        self.lava_block = pygame.image.load("岩浆方块.png")
-        self.water_block = pygame.image.load("水方块.png")
-        self.grass = pygame.image.load("草.png")
-        self.no_block = pygame.image.load("无方块.png")
-        self.player_generation_surface = pygame.image.load("地形生成封面.png")
-        self.terrain_generation_surface = pygame.image.load("玩家生成封面.png")
+        self.soil_block = pygame.image.load(r"./方块图片/土方块.png")
+        self.stone_block = pygame.image.load(r"./方块图片/石方块.png")
+        self.grass_block = pygame.image.load(r"./方块图片/草方块.png")
+        self.leave_block = pygame.image.load(r"./方块图片/树叶方块.png")
+        self.wood_block = pygame.image.load(r"./方块图片/木方块.png")
+        self.sand_block = pygame.image.load(r"./方块图片/沙子方块.png")
+        self.lava_block = pygame.image.load(r"./方块图片/岩浆方块.png")
+        self.water_block = pygame.image.load(r"./方块图片/水方块.png")
+        self.grass = pygame.image.load(r"./方块图片/草.png")
+        self.no_block = pygame.image.load(r"./方块图片/无方块.png")
+        self.player_generation_surface = pygame.image.load(r"./生成图片/地形生成封面.png")
+        self.terrain_generation_surface = pygame.image.load(r"./生成图片/玩家生成封面.png")
         
         # self.game_name = _TypeInterface.game_name
         # self.player_name = _TypeInterface.player_name
@@ -209,31 +191,18 @@ class MainPygameInterface(object):
         self.offset_jump = 0 
         self.key_list = []
         
-        self.player_rect = pygame.rect()
-        
     def pygame_run(self):
         while True:
             for i in self.key_list:
-                if i == 1:self.offset_around += 0.3
-                if i == 2:self.offset_around -= 0.3
-                if i == 3:
-                    for i in range(5):
-                        self.offset_jump += 0.3
-                    for i in range(5):
-                        self.offset_jump -= 0.3
+                if i == 1:self.offset_around += 0.2
+                if i == 2:self.offset_around -= 0.2
+                if i == 3:self.offset_jump += 0.3
+                if i == 4:self.offset_jump -= 0.3
                 
-            if int(self.offset_around) == 1:
-                self.offset_around = 0
-                self.x -= 1
-            elif int(self.offset_around) == -1:
-                self.offset_around = 0
-                self.x += 1
-            elif int(self.offset_jump) == 1:
-                self.offset_jump = 0
-                self.y -= 1
-            elif int(self.offset_jump) == -1:
-                self.offset_jump = 0
-                self.y += 1
+            if int(self.offset_around) == 1:self.offset_around = 0;self.x -= 1
+            elif int(self.offset_around) == -1:self.offset_around = 0;self.x += 1
+            elif int(self.offset_jump) == 1:self.offset_jump = 0;self.y -= 1
+            elif int(self.offset_jump) == -1:self.offset_jump = 0;self.y += 1
                 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:pygame.quit();sys.exit()
@@ -244,8 +213,8 @@ class MainPygameInterface(object):
                         self.key_list.append(2)
                     elif event.key == pygame.K_UP or event.key == pygame.K_w:
                         self.key_list.append(3)
-                    # elif event.key == pygame.K_o:
-                    #     ...
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.key_list.append(4)
                     
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_LEFT or event.key == pygame.K_a:
@@ -254,7 +223,9 @@ class MainPygameInterface(object):
                         self.key_list.remove(2)
                     elif event.key == pygame.K_UP or event.key == pygame.K_w:
                         self.key_list.remove(3)
-                 
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.key_list.remove(4)
+                        
             x = -100;addition1 = -3
             for i in range(int(self.screen_height/100+4)):
                 y = -100;addition2 = -3
@@ -293,7 +264,8 @@ class TypeInterface(object):
         
         self.number_type_dict = {
             "超平坦模式" : 1,
-            "正常模式（推荐）" : 2
+            "正常模式（推荐）" : 2,
+            "陡峭模式" : 3,
         }
         
         self.number_game_dict = {
@@ -318,7 +290,7 @@ class TypeInterface(object):
         
         self.terrain_type_label = tk.Label(self.windows,text="设置地形：")
         self.terrain_type_label.pack()
-        self.terrain_type_combobox = Combobox(self.windows,values=["正常模式（推荐）", "超平坦模式"],textvariable = self.terrain_type_text,state="readonly")
+        self.terrain_type_combobox = Combobox(self.windows,values=["正常模式（推荐）", "超平坦模式","陡峭模式"],textvariable = self.terrain_type_text,state="readonly")
         self.terrain_type_combobox.pack()
         
         self.game_type_label = tk.Label(self.windows,text="设置游戏类型：")
@@ -352,7 +324,7 @@ class ChooseInterface(object):
         self.ChooseInterface_photo = tk.PhotoImage(file="游戏封面.png")
         self.ChooseInterface_image = tk.Label(self.windows,image=self.ChooseInterface_photo)
         self.ChooseInterface_image.grid(row=0,column=0)
-        self.windows.iconphoto(True,tk.PhotoImage(file='游戏图标.png'))
+        self.windows.iconphoto(True,tk.PhotoImage(file="游戏图标.png"))
         
         self.begin_button = tk.Button(self.windows,text="开始冒险吧",height=2,width=13,font=("44"),command=self.begin_button_command)
         self.update_button = tk.Button(self.windows,text="游戏更新内容",height=2,width=13,font=("18"),command=self.update_button_command)
